@@ -14428,9 +14428,9 @@ prism-react-renderer@^1.1.1:
   integrity sha512-w23ch4f75V1Tnz8DajsYKvY5lF7H1+WvzvLUcF0paFxkTHSp42RS0H5CttdN2Q8RR3DRGZ9v5xD/h3n8C8kGmg==
 
 prismjs@^1.21.0:
-  version "1.24.1"
-  resolved "https://registry.yarnpkg.com/prismjs/-/prismjs-1.24.1.tgz#c4d7895c4d6500289482fa8936d9cdd192684036"
-  integrity sha512-mNPsedLuk90RVJioIky8ANZEwYm5w9LcvCXrxHlwf4fNVSn8jEipMybMkWUyyF0JhnC+C4VcOVSBuHRKs1L5Ow==
+  version "1.25.0"
+  resolved "https://registry.yarnpkg.com/prismjs/-/prismjs-1.25.0.tgz#6f822df1bdad965734b310b315a23315cf999756"
+  integrity sha512-WCjJHl1KEWbnkQom1+SzftbtXMKQoezOCYs5rECqMN+jP+apI7ftoflyqigqzopSO3hMhTEb0mFClA8lkolgEg==
 
 process-nextick-args@^2.0.0, process-nextick-args@~2.0.0:
   version "2.0.1"
@@ -17333,11 +17333,6 @@ umask@^1.1.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/umask/-/umask-1.1.0.tgz#f29cebf01df517912bb58ff9c4e50fde8e33320d"
   integrity sha1-8pzr8B31F5ErtY/5xOUP3o4zMg0=
-
-umi-plugin-hire@^1.0.3:
-  version "1.0.6"
-  resolved "https://registry.yarnpkg.com/umi-plugin-hire/-/umi-plugin-hire-1.0.6.tgz#267f6755a40bd5bc8442cfcc53ca072defe60f07"
-  integrity sha512-POna9n6paM4uHglvLKGxV3kw203gpZ1nlL58M31DBLzp1anyaLpQy51HBG0sC6GAy0DS2FLJZhVS5zcBPJLM2g==
 
 umi-webpack-bundle-analyzer@3.6.2:
   version "3.6.2"
