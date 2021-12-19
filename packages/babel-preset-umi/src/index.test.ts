@@ -1,6 +1,6 @@
+import { transform } from '@babel/core';
 import { deepmerge, winPath } from '@umijs/utils';
 import { join } from 'path';
-import { transform } from '@babel/core';
 import { IOpts } from './index';
 
 const DEFAULT_OPTS = {
@@ -30,6 +30,21 @@ test('esm', () => {
     },
   });
   expect(code).toContain(`import { a } from './a';`);
+});
+
+test('typescript 4.2 abstract Construct Signatures', () => {
+  const code = transformWithPreset(
+    `
+abstract class Shape {
+    abstract getArea(): number;
+}
+  `,
+    {
+      typescript: true,
+    },
+  );
+  expect(code).toContain(`var Shape = function Shape() {`);
+  expect(code).toContain(`_classCallCheck(this, Shape);`);
 });
 
 test('typescript', () => {
@@ -110,6 +125,18 @@ test('typescript with nest-injection', () => {
   expect(code).toContain(
     '_initializerDefineProperty(this, "appService2", _descriptor2, this);',
   );
+});
+
+test('typescript key remapping types', () => {
+  const code = transformWithPreset(
+    `type Options = {
+      [K in "noImplicitAny" | "strictNullChecks" | "strictFunctionTypes"]?: boolean
+    };`,
+    {
+      typescript: true,
+    },
+  );
+  expect(code).toContain('"use strict"');
 });
 
 test('dynamic import', () => {
@@ -306,7 +333,9 @@ test('svgr', () => {
       svgr: {},
     },
   );
-  expect(winPath(code!)).toContain(`index.js?-svgo,+titleProp,+ref!./a.svg");`);
+  expect(winPath(code!)).toContain(
+    `svgr-webpack.js?-svgo,+titleProp,+ref!./a.svg");`,
+  );
 });
 
 test('logical assignment operators', () => {
@@ -325,4 +354,33 @@ test('top level await', () => {
     },
   });
   expect(code).toContain(`await delay(1000);`);
+});
+
+test('record', () => {
+  const code = transformWithPreset(`#{ x: 1, y: 2 }`, {
+    env: {
+      targets: { ie: 10 },
+    },
+  });
+  expect(code).toContain(`\"use strict\";
+
+var _recordTuplePolyfill = require(\"@umijs/deps/reexported/record-tuple-polyfill\");
+
+(0, _recordTuplePolyfill.Record)({
+  x: 1,
+  y: 2
+});`);
+});
+
+test('tuple', () => {
+  const code = transformWithPreset(`#[1, 2, 3];`, {
+    env: {
+      targets: { ie: 10 },
+    },
+  });
+  expect(code).toContain(`\"use strict\";
+
+var _recordTuplePolyfill = require(\"@umijs/deps/reexported/record-tuple-polyfill\");
+
+(0, _recordTuplePolyfill.Tuple)(1, 2, 3);`);
 });

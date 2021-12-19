@@ -1,18 +1,17 @@
+import bodyParser from '@umijs/deps/compiled/body-parser';
+import multer from '@umijs/deps/compiled/multer';
+import pathToRegexp from '@umijs/deps/compiled/path-to-regexp';
 import {
   IApi,
-  RequestHandler,
-  Request,
-  NextFunction,
   IRoute,
+  NextFunction,
+  Request,
+  RequestHandler,
 } from '@umijs/types';
-import { winPath, createDebug, glob } from '@umijs/utils';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { createDebug, glob, winPath } from '@umijs/utils';
 import assert from 'assert';
-import bodyParser from 'body-parser';
-import multer from 'multer';
-import pathToRegexp from 'path-to-regexp';
-import { matchRoutes, RouteConfig } from 'react-router-config';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import { getFlatRoutes } from '../../../commands/htmlUtils';
 
 const VALID_METHODS = ['get', 'post', 'put', 'patch', 'delete'];
@@ -27,6 +26,14 @@ export interface IOpts {
 interface IGetMockPaths extends Required<Pick<IApi, 'cwd'>> {
   ignore?: string[];
   registerBabel?: (paths: string[]) => void;
+  paths?: {
+    cwd?: string;
+    absNodeModulesPath?: string;
+    absSrcPath?: string;
+    absPagesPath?: string;
+    absOutputPath?: string;
+    absTmpPath?: string;
+  };
 }
 
 export interface IMockDataItem {
@@ -136,13 +143,13 @@ function parseKey(key: string) {
   };
 }
 
-function createHandler(method: any, path: any, handler: any): RequestHandler {
-  return function (req: Request, res: Response, next: NextFunction) {
+function createHandler(method: any, path: any, handler: any) {
+  return function (req: Request, res: any, next: NextFunction) {
     if (BODY_PARSED_METHODS.includes(method)) {
       bodyParser.json({ limit: '5mb', strict: false })(req, res, () => {
         bodyParser.urlencoded({ limit: '5mb', extended: true })(
           req,
-          res,
+          res as any,
           () => {
             sendData();
           },
@@ -161,7 +168,7 @@ function createHandler(method: any, path: any, handler: any): RequestHandler {
         res.json(handler);
       }
     }
-  };
+  } as unknown as RequestHandler;
 }
 
 export const normalizeConfig = (config: any) => {
@@ -231,6 +238,7 @@ export const matchMock = (
       }
     }
   }
+  return undefined;
 };
 
 /**

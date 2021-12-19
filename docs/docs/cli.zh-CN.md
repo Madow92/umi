@@ -204,7 +204,9 @@ $ umi webpack --rule=js
   use:[
     {
       loader:'xx/babel-loader/lib/index.js',
-      options: [Object]
+      options: {
+        sourceType: 'unambiguous'
+      }
     }
   ]
 }
@@ -229,5 +231,15 @@ MiniCssExtractPlugin {
     ignoreOrder: true,
     chunkFilename: '[name].chunk.css'
   }
+}
+```
+
+默认会打印 development 的配置，如需查看 production 配置，需要指定环境变量：
+
+```bash
+$ NODE_ENV=production umi webpack
+
+{
+  mode: 'production'
 }
 ```

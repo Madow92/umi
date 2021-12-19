@@ -1,7 +1,7 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { IApi } from '@umijs/types';
 import { getFile, winPath } from '@umijs/utils';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { runtimePath } from '../constants';
 
 export default function (api: IApi) {
@@ -20,6 +20,7 @@ export default function (api: IApi) {
         'rootContainer',
         'render',
         'onRouteChange',
+        '__mfsu',
       ],
     });
     const plugins = await api.applyPlugins({

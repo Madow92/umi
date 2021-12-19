@@ -14,7 +14,7 @@ export default (api: IApi) => {
     },
   });
 
-  api.addBeforeMiddewares(() => {
+  api.addBeforeMiddlewares(() => {
     return (req, res, next) => {
       if (req.path.includes('@@/devScripts.js')) {
         api
@@ -26,7 +26,7 @@ export default (api: IApi) => {
                 ? [
                     readFileSync(
                       require.resolve(
-                        '@umijs/bundler-webpack/bundled/webpackHotDevClient',
+                        '@umijs/bundler-webpack/bundled/js/webpackHotDevClient',
                       ),
                       'utf-8',
                     ),
@@ -109,6 +109,8 @@ if (window.g_initWebpackHotDevClient) {
     tryApplyUpdates,
   });
 }
+
+export const __mfsu = 1;
       `
           : '',
     });

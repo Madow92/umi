@@ -1,56 +1,118 @@
-import * as fs from 'fs';
+import { webpack } from '@umijs/bundler-webpack';
+import { Route } from '@umijs/core';
+import serialize from '@umijs/deps/compiled/serialize-javascript';
+// @ts-ignore
+import { getCompilerHooks } from '@umijs/deps/compiled/webpack-manifest-plugin';
+import { BundlerConfigType, IApi } from '@umijs/types';
+import {
+  cleanRequireCache,
+  lodash as _,
+  Mustache,
+  routeToChunkName,
+  winPath,
+} from '@umijs/utils';
 import assert from 'assert';
+import fs from 'fs';
+import { EOL } from 'os';
 import * as path from 'path';
 import { performance } from 'perf_hooks';
-import { Route } from '@umijs/core';
-import { IApi, BundlerConfigType } from '@umijs/types';
-import { winPath, Mustache, lodash as _, routeToChunkName } from '@umijs/utils';
 import { matchRoutes, RouteConfig } from 'react-router-config';
-import { webpack } from '@umijs/bundler-webpack';
 import { getHtmlGenerator } from '../../commands/htmlUtils';
 import {
+  CHUNK_MANIFEST,
   CHUNK_NAME,
-  OUTPUT_SERVER_FILENAME,
-  TMP_PLUGIN_DIR,
   CLIENT_EXPORTS,
+  OUTPUT_SERVER_FILENAME,
+  OUTPUT_SERVER_TYPE_FILENAME,
+  TMP_PLUGIN_DIR,
 } from './constants';
+import ServerTypePlugin from './serverTypePlugin';
+
+class ManifestChunksMapPlugin {
+  constructor(public opts: { api: IApi }) {
+    this.opts = opts;
+  }
+
+  apply(compiler: webpack.Compiler) {
+    let chunkGroups: any;
+    const { beforeEmit } = getCompilerHooks(compiler);
+
+    compiler.hooks.emit.tapPromise(
+      'ManifestChunksMapPlugin',
+      async (compilation: any) => {
+        chunkGroups = compilation.chunkGroups;
+      },
+    );
+
+    beforeEmit.tap('ManifestChunksMapPlugin', (manifest: object) => {
+      if (chunkGroups) {
+        const fileFilter = (file: string) =>
+          !file.endsWith('.map') && !file.endsWith('.hot-update.js');
+        const addPath = (file: string) =>
+          `${this.opts.api.config.publicPath}${file}`;
+        try {
+          const _chunksMap = chunkGroups.reduce((acc: any[], c: any) => {
+            acc[c.name] = [
+              ...(acc[c.name] || []),
+              ...c.chunks.reduce(
+                (files: any[], cc: any) => [
+                  ...files,
+                  ...cc.files.filter(fileFilter).map(addPath),
+                ],
+                [],
+              ),
+            ];
+            return acc;
+          }, {});
+          return {
+            // IMPORTANT: hard code for `_chunkMap` field
+            _chunksMap,
+            ...manifest,
+          };
+        } catch (e) {
+          this.opts.api.logger.error('[SSR chunkMap ERROR]', e);
+        }
+      }
+      return manifest;
+    });
+  }
+}
 
 /**
- * onBuildComplete for test case
- * replace default html template using client webpack bundle complete
+ * export `onBuildComplete` just for the unit case
+ * replace default html placeholder with the latest html (hash)
  * @param api
  */
-export const onBuildComplete = (api: IApi, _isTest = false) => async ({
-  err,
-  stats,
-}: any) => {
-  if (!err && stats?.stats) {
-    const HTML_REG = /<html.*?<\/html>/m;
-    const [clientStats] = stats.stats;
-    const html = getHtmlGenerator({ api });
-    const [defaultHTML] =
-      JSON.stringify(
-        await html.getContent({
+export const onBuildComplete =
+  (api: IApi) =>
+  async ({ err, stats }: any) => {
+    if (!err && stats?.stats) {
+      // get content between `<html>*</html>`
+      const HTML_REG = /\\u003Chtml.*?\\u003C\\u002Fhtml\\u003E/m;
+      const [clientStats] = stats.stats;
+      const htmlGenerator = getHtmlGenerator({ api });
+      const latestHTML = serialize(
+        await htmlGenerator.getContent({
           route: { path: api.config.publicPath },
           chunks: clientStats.compilation.chunks,
         }),
-      ).match(HTML_REG) || [];
-    const serverPath = path.join(
-      api.paths.absOutputPath!,
-      OUTPUT_SERVER_FILENAME,
-    );
-    if (fs.existsSync(serverPath) && defaultHTML) {
-      const serverContent = fs
-        .readFileSync(serverPath, 'utf-8')
-        .replace(HTML_REG, defaultHTML);
-      // for test case
-      if (_isTest) {
-        return serverContent;
+      );
+      const [htmlContent] = latestHTML.match(HTML_REG) || [];
+      const serverPath = path.join(
+        api.paths.absOutputPath!,
+        OUTPUT_SERVER_FILENAME,
+      );
+
+      // replace `umi.server.js` default html into latest serialize html
+      if (fs.existsSync(serverPath) && latestHTML) {
+        const serverContent = (
+          await fs.promises.readFile(serverPath, 'utf-8')
+        ).replace(HTML_REG, htmlContent);
+        await fs.promises.writeFile(serverPath, serverContent);
       }
-      fs.writeFileSync(serverPath, serverContent);
     }
-  }
-};
+    return undefined;
+  };
 
 export default (api: IApi) => {
   api.describe({
@@ -89,6 +151,7 @@ export default (api: IApi) => {
 
   api.onStart(() => {
     assert(
+      // @ts-ignore
       api.config.history?.type !== 'hash',
       'the `type` of `history` must be `browser` when using SSR',
     );
@@ -114,7 +177,7 @@ export default (api: IApi) => {
 
   api.onGenerateFiles(async () => {
     const serverTpl = path.join(winPath(__dirname), 'templates/server.tpl');
-    const serverContent = fs.readFileSync(serverTpl, 'utf-8');
+    const serverContent = await fs.promises.readFile(serverTpl, 'utf-8');
     const html = getHtmlGenerator({ api });
 
     const defaultHTML = await html.getContent({
@@ -123,6 +186,7 @@ export default (api: IApi) => {
     });
 
     const routes = await api.getRoutes();
+
     api.writeTmpFile({
       path: 'core/server.ts',
       content: Mustache.render(serverContent, {
@@ -131,6 +195,7 @@ export default (api: IApi) => {
           routes,
           config: api.config,
           cwd: api.cwd,
+          isServer: true,
         }),
         RuntimePath: winPath(
           path.dirname(require.resolve('@umijs/runtime/package.json')),
@@ -141,25 +206,32 @@ export default (api: IApi) => {
         RuntimePolyfill: winPath(
           require.resolve('regenerator-runtime/runtime'),
         ),
-        loadingComponent: api.config.dynamicImport?.loading,
+        loadingComponent:
+          // @ts-ignore
+          api.config.dynamicImport?.loading &&
+          // @ts-ignore
+          winPath(api.config.dynamicImport?.loading),
         DynamicImport: !!api.config.dynamicImport,
         Utils: winPath(require.resolve('./templates/utils')),
-        Mode: !!api.config.ssr?.mode || 'string',
+        // @ts-ignore
+        Mode: api.config.ssr?.mode ?? 'string',
         MountElementId: api.config.mountElementId,
+        // @ts-ignore
         StaticMarkup: !!api.config.ssr?.staticMarkup,
         // @ts-ignore
         ForceInitial: !!api.config.ssr?.forceInitial,
+        // @ts-ignore
         RemoveWindowInitialProps: !!api.config.ssr?.removeWindowInitialProps,
         Basename: api.config.base,
         PublicPath: api.config.publicPath,
         ManifestFileName: api.config.manifest
-          ? api.config.manifest.fileName || 'asset-manifest.json'
+          ? api.config.manifest.fileName || CHUNK_MANIFEST
           : '',
-        DEFAULT_HTML_PLACEHOLDER: JSON.stringify(defaultHTML),
+        DEFAULT_HTML_PLACEHOLDER: serialize(defaultHTML),
       }),
     });
 
-    const clientExportsContent = fs.readFileSync(
+    const clientExportsContent = await fs.promises.readFile(
       path.join(winPath(__dirname), `templates/${CLIENT_EXPORTS}.tpl`),
       'utf-8',
     );
@@ -206,26 +278,38 @@ export default (api: IApi) => {
 
   api.modifyConfig((config) => {
     // force enable writeToDisk
+    // @ts-ignore
     config.devServer.writeToDisk = (filePath: string) => {
-      const manifestFile =
-        api.config?.manifest?.fileName || 'asset-manifest.json';
-      const regexp = new RegExp(`(${OUTPUT_SERVER_FILENAME}|${manifestFile})$`);
+      const regexp = new RegExp(
+        `(${OUTPUT_SERVER_FILENAME}|${OUTPUT_SERVER_TYPE_FILENAME})$`,
+      );
       return regexp.test(filePath);
     };
     // enable manifest
     if (config.dynamicImport) {
       config.manifest = {
-        writeToFileEmit: false,
+        writeToFileEmit: true,
         ...(config.manifest || {}),
       };
     }
     return config;
   });
 
+  // make sure to clear umi.server.js cache
+  api.onDevCompileDone(() => {
+    const serverExp = new RegExp(_.escapeRegExp(OUTPUT_SERVER_FILENAME));
+    // clear require cache
+    for (const moduleId of Object.keys(require.cache)) {
+      if (serverExp.test(moduleId)) {
+        cleanRequireCache(moduleId);
+      }
+    }
+  });
+
   // modify devServer content
   api.modifyDevHTMLContent(async (defaultHtml, { req }) => {
     // umi dev to enable server side render by default
-    const { stream, devServerRender = true } = api.config?.ssr || {};
+    const { mode, devServerRender = true } = api.config?.ssr || {};
     const serverPath = path.join(
       api.paths.absOutputPath!,
       OUTPUT_SERVER_FILENAME,
@@ -237,7 +321,7 @@ export default (api: IApi) => {
 
     try {
       const startTime = performance.nodeTiming.duration;
-      const render = require(serverPath);
+      let render = require(serverPath);
       const context = {};
       const { html, error } = await render({
         origin: `${req.protocol}://${req.get('host')}`,
@@ -249,18 +333,14 @@ export default (api: IApi) => {
       });
       const endTime = performance.nodeTiming.duration;
       console.log(
-        `[SSR] ${stream ? 'stream' : ''} render ${req.url} start: ${(
+        `[SSR] ${mode === 'stream' ? 'stream' : ''} render ${req.url} start: ${(
           endTime - startTime
         ).toFixed(2)}ms`,
       );
       if (error) {
         throw error;
       }
-      // if dev clear cache, OOM
-      if (require.cache[serverPath]) {
-        // replace default html
-        delete require.cache[serverPath];
-      }
+      render = null;
       return html;
     } catch (e) {
       api.logger.error('[SSR]', e);
@@ -294,6 +374,14 @@ export default (api: IApi) => {
           maxChunks: 1,
         },
       ]);
+      config.plugin('generate-server-type').use(ServerTypePlugin, [
+        [
+          {
+            name: OUTPUT_SERVER_TYPE_FILENAME,
+            content: `import { IServerRender } from 'umi';${EOL}export = render;${EOL}export as namespace render;${EOL}declare const render: IServerRender;`,
+          },
+        ],
+      ]);
       config.plugin('define').tap(([args]) => [
         {
           ...args,
@@ -304,6 +392,9 @@ export default (api: IApi) => {
 
       config.externals([]);
     } else {
+      config
+        .plugin('ManifestChunksMap')
+        .use(ManifestChunksMapPlugin, [{ api }]);
       // define client bundler config
       config.plugin('define').tap(([args]) => [
         {

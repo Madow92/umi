@@ -1,14 +1,12 @@
-import { join } from 'path';
-import { EventEmitter } from 'events';
-import assert from 'assert';
+import { AsyncSeriesWaterfallHook } from '@umijs/deps/compiled/tapable';
 import { BabelRegister, lodash, NodeEnv } from '@umijs/utils';
-import { AsyncSeriesWaterfallHook } from 'tapable';
+import assert from 'assert';
+import { EventEmitter } from 'events';
 import { existsSync } from 'fs';
+import { join } from 'path';
+import Config from '../Config/Config';
+import { getUserConfigWithKey } from '../Config/utils/configUtils';
 import Logger from '../Logger/Logger';
-import { pathToObj, resolvePlugins, resolvePresets } from './utils/pluginUtils';
-import loadDotEnv from './utils/loadDotEnv';
-import isPromise from './utils/isPromise';
-import PluginAPI from './PluginAPI';
 import {
   ApplyPluginsType,
   ConfigChangeType,
@@ -16,10 +14,12 @@ import {
   PluginType,
   ServiceStage,
 } from './enums';
-import { ICommand, IHook, IPackage, IPlugin, IPreset } from './types';
-import Config from '../Config/Config';
-import { getUserConfigWithKey } from '../Config/utils/configUtils';
 import getPaths from './getPaths';
+import PluginAPI from './PluginAPI';
+import { ICommand, IHook, IPackage, IPlugin, IPreset } from './types';
+import isPromise from './utils/isPromise';
+import loadDotEnv from './utils/loadDotEnv';
+import { pathToObj, resolvePlugins, resolvePresets } from './utils/pluginUtils';
 
 const logger = new Logger('umi:core:Service');
 
@@ -28,6 +28,7 @@ export interface IServiceOpts {
   pkg?: IPackage;
   presets?: string[];
   plugins?: string[];
+  configFiles?: string[];
   env?: NodeEnv;
 }
 
@@ -113,10 +114,15 @@ export default class Service extends EventEmitter {
 
     // get user config without validation
     logger.debug('get user config');
+    const configFiles = opts.configFiles;
     this.configInstance = new Config({
       cwd: this.cwd,
       service: this,
       localConfig: this.env === 'development',
+      configFiles:
+        Array.isArray(configFiles) && !!configFiles[0]
+          ? configFiles
+          : undefined,
     });
     this.userConfig = this.configInstance.getUserConfig();
     logger.debug('userConfig:');
@@ -174,8 +180,8 @@ export default class Service extends EventEmitter {
   loadEnv() {
     const basePath = join(this.cwd, '.env');
     const localPath = `${basePath}.local`;
-    loadDotEnv(basePath);
     loadDotEnv(localPath);
+    loadDotEnv(basePath);
   }
 
   async init() {
@@ -541,6 +547,7 @@ ${name} from ${plugin.path} register failed.`);
       key: 'onStart',
       type: ApplyPluginsType.event,
       args: {
+        name,
         args,
       },
     });

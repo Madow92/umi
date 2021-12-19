@@ -1,10 +1,11 @@
+import { cleanup, getByText, render, waitFor } from '@testing-library/react';
+import { createMemoryHistory, dynamic, Plugin } from '@umijs/runtime';
 import React from 'react';
-import { render, cleanup, waitFor, getByText } from '@testing-library/react';
 import { act } from 'react-dom/test-utils';
-import { createMemoryHistory, Plugin, dynamic } from '@umijs/runtime';
 import renderClient, { preloadComponent } from './renderClient';
 
-let container;
+let container: any;
+
 beforeEach(() => {
   container = document.createElement('div');
   container.id = 'app';
@@ -13,12 +14,12 @@ beforeEach(() => {
   window.g_initialProps = null;
 });
 
-afterEach(() => {
+afterEach(async () => {
   document.body.removeChild(container);
   container = null;
   delete window.g_useSSR;
   delete window.g_initialProps;
-  cleanup();
+  await cleanup();
 });
 
 test('normal', async () => {
@@ -117,7 +118,9 @@ test('normal with mount', async () => {
   expect(routeChanges).toEqual(['POP /foo', 'PUSH /bar']);
 });
 
-const Common = ({ title }) => {
+const Common: React.FC<{ title: string }> & {
+  getInitialProps: (props: any) => any;
+} = ({ title }) => {
   return <h1>{title}</h1>;
 };
 
@@ -157,9 +160,8 @@ test('preloadComponent', async () => {
       path: '/',
       component: dynamic({
         loading: () => <div>loading</div>,
-        loader: async () => (props) => (
-          <div className="layout">{props.children}</div>
-        ),
+        loader: async () => (props: React.PropsWithChildren<{}>) =>
+          <div className="layout">{props.children}</div>,
       }),
       routes: [
         {
@@ -237,9 +239,8 @@ test('preloadComponent routeChange with ssr', async () => {
       path: '/',
       component: dynamic({
         loading: () => <div>loading</div>,
-        loader: async () => (props) => (
-          <div className="layout">{props.children}</div>
-        ),
+        loader: async () => (props: React.PropsWithChildren<{}>) =>
+          <div className="layout">{props.children}</div>,
       }),
       routes: [
         {

@@ -1,11 +1,11 @@
-import { existsSync } from 'fs';
-import { join } from 'path';
+import pathToRegexp from '@umijs/deps/compiled/path-to-regexp';
 import { IApi, IRoute } from '@umijs/types';
 import { deepmerge, rimraf } from '@umijs/utils';
-import pathToRegexp from 'path-to-regexp';
-
-import { isDynamicRoute } from '../utils';
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { Stream } from 'stream';
 import { OUTPUT_SERVER_FILENAME } from '../features/ssr/constants';
+import { isDynamicRoute, streamToString } from '../utils';
 
 export default (api: IApi) => {
   api.describe({
@@ -30,14 +30,14 @@ export default (api: IApi) => {
   });
 
   api.modifyConfig((memo) => {
-    if (memo.exportStatic?.dynamicRoot) {
+    if (memo.exportStatic && memo.exportStatic?.dynamicRoot) {
       memo.runtimePublicPath = true;
     }
     return memo;
   });
 
   api.onPatchRoute(({ route }) => {
-    if (!api.config.exportStatic?.htmlSuffix) return;
+    if (api.config.exportStatic && !api.config.exportStatic?.htmlSuffix) return;
     if (route.path) {
       route.path = addHtmlSuffix(route.path, !!route.routes);
     }
@@ -51,6 +51,7 @@ export default (api: IApi) => {
         rootIndex = index;
       }
     });
+
     if (rootIndex !== null) {
       routes.splice(rootIndex, 0, {
         ...routes[rootIndex],
@@ -111,7 +112,8 @@ export default (api: IApi) => {
         });
         api.logger.info(`${route.path} render success`);
         if (!error) {
-          return html;
+          // convert into string if html instance stream
+          return html instanceof Stream ? streamToString(html) : html;
         } else {
           serverRenderFailed = true;
           api.logger.error(`[SSR] ${route.path}`, error);
@@ -148,13 +150,13 @@ export default (api: IApi) => {
       }
     }
   });
-
-  function addHtmlSuffix(path: string, hasRoutes: boolean) {
-    if (path === '/') return path;
-    if (hasRoutes) {
-      return path.endsWith('/') ? path : `${path}(.html)?`;
-    } else {
-      return path.endsWith('/') ? `${path.slice(0, -1)}.html` : `${path}.html`;
-    }
-  }
 };
+
+export function addHtmlSuffix(path: string, hasRoutes: boolean) {
+  if (path === '/') return path;
+  if (hasRoutes) {
+    return path.endsWith('/') ? path : `${path}(.html)?`;
+  } else {
+    return path.endsWith('/') ? `${path.slice(0, -1)}.html` : `${path}.html`;
+  }
+}

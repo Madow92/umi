@@ -1,11 +1,11 @@
-import ejs from 'ejs';
+import ejs from '@umijs/deps/compiled/ejs';
+import prettier from '@umijs/deps/reexported/prettier';
+import { cheerio } from '@umijs/utils';
+import assert from 'assert';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import assert from 'assert';
-import { cheerio } from '@umijs/utils';
-import prettier from 'prettier';
 import { IConfig } from '..';
-import { IOpts, IGetContentArgs, IScript } from './types';
+import { IGetContentArgs, IOpts, IScript } from './types';
 
 class Html {
   config: IConfig;
@@ -25,7 +25,10 @@ class Html {
     path = path.replace(/^\//, '');
     path = path.replace(/\/$/, '');
 
-    if (this.config.exportStatic?.htmlSuffix || path === 'index.html') {
+    if (
+      (this.config.exportStatic && this.config.exportStatic.htmlSuffix) ||
+      path === 'index.html'
+    ) {
       return `${path}`;
     } else {
       return `${path}/index.html`;
@@ -36,8 +39,11 @@ class Html {
     const htmlPath = this.getHtmlPath(path);
     const len = htmlPath.split('/').length;
     return (
-      Array(this.config.exportStatic?.htmlSuffix ? len : len - 1).join('../') ||
-      './'
+      Array(
+        this.config.exportStatic && this.config.exportStatic.htmlSuffix
+          ? len
+          : len - 1,
+      ).join('../') || './'
     );
   }
 
@@ -46,7 +52,7 @@ class Html {
       return opts.file;
     }
     const file = opts.file.charAt(0) === '/' ? opts.file.slice(1) : opts.file;
-    if (this.config.exportStatic?.dynamicRoot) {
+    if (this.config.exportStatic && this.config.exportStatic.dynamicRoot) {
       return `${this.getRelPathToPublicPath(opts.path || '/')}${file}`;
     } else {
       return `${this.config.publicPath}${file}`;
@@ -117,6 +123,7 @@ class Html {
     });
 
     let $ = cheerio.load(html, {
+      // @ts-ignore
       decodeEntities: false,
     });
 

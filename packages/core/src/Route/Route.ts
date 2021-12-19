@@ -1,8 +1,7 @@
 import { lodash, winPath } from '@umijs/utils';
-import { join } from 'path';
-import { IConfig, IRoute } from '..';
 import assert from 'assert';
-import path from 'path';
+import path, { join } from 'path';
+import { IConfig, IRoute } from '..';
 import getConventionalRoutes from './getConventionalRoutes';
 import routesToJSON from './routesToJSON';
 
@@ -137,7 +136,12 @@ class Route {
     return getConventionalRoutes(opts);
   }
 
-  getJSON(opts: { routes: IRoute[]; config: IConfig; cwd: string }) {
+  getJSON(opts: {
+    routes: IRoute[];
+    config: IConfig;
+    cwd: string;
+    isServer?: boolean;
+  }) {
     return routesToJSON(opts);
   }
 

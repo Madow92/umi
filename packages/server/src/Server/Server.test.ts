@@ -1,11 +1,11 @@
-import express from 'express';
-import { Server as NetServer } from 'net';
+import express from '@umijs/deps/compiled/express';
+import portfinder from '@umijs/deps/compiled/portfinder';
+import sockjs, { Connection } from '@umijs/deps/compiled/sockjs';
+import { delay, got } from '@umijs/utils';
 import http from 'http';
 import http2 from 'http2';
-import { got, delay } from '@umijs/utils';
-import portfinder from 'portfinder';
+import { Server as NetServer } from 'net';
 import SockJS from 'sockjs-client';
-import sockjs, { Connection } from 'sockjs';
 import Server from './Server';
 
 function initSocket({
@@ -593,7 +593,7 @@ describe('proxy', () => {
           target: `http://${host}:${proxyServer1Port}`,
           changeOrigin: true,
           bypass(req) {
-            if (req.url === '/api/compiler') {
+            if ((req as any).url === '/api/compiler') {
               return '/bypass';
             }
             return null;

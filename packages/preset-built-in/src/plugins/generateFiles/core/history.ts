@@ -1,6 +1,6 @@
+import { IApi } from '@umijs/types';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { IApi } from '@umijs/types';
 import { runtimePath } from '../constants';
 
 export default function (api: IApi) {
@@ -37,6 +37,10 @@ export default function (api: IApi) {
       'utf-8',
     );
     const history = api.config.history!;
+
+    // history 不可能为 false，这里是为了 ts 编译
+    if (!history) return;
+
     const { type, options = {} } = history;
 
     api.writeTmpFile({

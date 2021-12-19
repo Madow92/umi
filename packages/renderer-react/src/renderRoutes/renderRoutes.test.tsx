@@ -1,14 +1,21 @@
+import {
+  cleanup,
+  getByText,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { Link, MemoryRouter, Plugin } from '@umijs/runtime';
 import React from 'react';
-import { MemoryRouter, Plugin, Link } from '@umijs/runtime';
-import { getByText, render, screen, waitFor } from '@testing-library/react';
-import renderRoutes from './renderRoutes';
 import { IRoute } from '..';
+import renderRoutes from './renderRoutes';
 
 function TestInitialProps({ foo }: { foo: string }) {
   return <h1 data-testid="test">{foo}</h1>;
 }
 
 let mountCount = 0;
+let renderCount = 0;
 function TestInitialPropsWithoutUnmount({ foo }: { foo: string }) {
   React.useEffect(() => {
     return () => {
@@ -25,6 +32,14 @@ function TestInitialPropsWithoutUnmount({ foo }: { foo: string }) {
   );
 }
 
+function TestInitialPropsWithMount({ foo }: { foo: string }) {
+  React.useEffect(() => {
+    mountCount++;
+  }, []);
+  renderCount++;
+  return <h1 data-testid="test">{foo}</h1>;
+}
+
 const getInitialProps = async () => {
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -37,6 +52,7 @@ const getInitialProps = async () => {
 
 TestInitialProps.getInitialProps = getInitialProps;
 TestInitialPropsWithoutUnmount.getInitialProps = getInitialProps;
+TestInitialPropsWithMount.getInitialProps = getInitialProps;
 
 function TestInitialPropsParent({
   foo,
@@ -81,7 +97,7 @@ const routerConfig = {
           path: '/layout',
           component: (props: any) => (
             <>
-              <h1 data-testid="test">Foo</h1>>
+              <h1 data-testid="test">Foo</h1>
               <h2 data-testid="routes-embed">
                 {props.routes.map((r: any) => r.path).join(',')}
               </h2>
@@ -127,6 +143,10 @@ const routerConfig = {
     {
       path: '/get-initial-props-without-unmount',
       component: TestInitialPropsWithoutUnmount as any,
+    },
+    {
+      path: '/get-initial-props-with-mount',
+      component: TestInitialPropsWithMount as any,
     },
     {
       path: '/get-initial-props-embed',
@@ -188,11 +208,14 @@ let routes = renderRoutes(routerConfig);
 beforeEach(() => {
   window.g_useSSR = true;
   window.g_initialProps = null;
+  mountCount = 0;
+  renderCount = 0;
 });
 
-afterEach(() => {
+afterEach(async () => {
   delete window.g_useSSR;
   delete window.g_initialProps;
+  await cleanup();
 });
 
 test('/layout', async () => {
@@ -274,36 +297,22 @@ test('/pass-props', async () => {
   expect((await screen.findByTestId('test')).innerHTML).toEqual('bar');
 });
 
-test('/get-initial-props', async () => {
+test('/get-initial-props-with-mount', async () => {
   const newRoutes = renderRoutes(routerConfig);
+
+  expect(mountCount).toEqual(0);
+  expect(renderCount).toEqual(0);
+
   const { container } = render(
-    <MemoryRouter initialEntries={['/get-initial-props']}>
+    <MemoryRouter initialEntries={['/get-initial-props-with-mount']}>
       {newRoutes}
     </MemoryRouter>,
   );
-  await waitFor(() => getByText(container, 'bar'));
-  expect((await screen.findByTestId('test')).innerHTML).toEqual('bar');
-});
 
-test('/get-initial-props-without-unmount', async () => {
-  const newRoutes = renderRoutes(routerConfig);
-  const { container } = render(
-    <MemoryRouter initialEntries={['/get-initial-props-without-unmount']}>
-      {newRoutes}
-    </MemoryRouter>,
-  );
   await waitFor(() => getByText(container, 'bar'));
-  expect((await screen.findByTestId('test2')).innerHTML).toEqual('bar');
-  expect(mountCount).toEqual(0);
-  // hash change
-  getByText(container, 'link-bar').click();
-  expect(mountCount).toEqual(0);
 
-  // change route
-  getByText(container, 'change-route').click();
   expect(mountCount).toEqual(1);
-  await waitFor(() => getByText(container, 'bar'));
-  expect((await screen.findByTestId('test')).innerHTML).toEqual('bar');
+  expect(renderCount).toEqual(2);
 });
 
 test('/get-initial-props-embed', async () => {
@@ -321,7 +330,7 @@ test('/get-initial-props-embed', async () => {
   );
 });
 
-test('/wrappers', async () => {
+test('/wrappers', () => {
   const { container } = render(
     <MemoryRouter initialEntries={['/wrappers']}>{routes}</MemoryRouter>,
   );

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Plugin, Redirect, ApplyPluginsType } from '@umijs/runtime';
-import { IRoute, IComponent } from '..';
-import Switch from './Switch';
+import { ApplyPluginsType, Plugin, Redirect } from '@umijs/runtime';
+import React, { createElement, useEffect, useState } from 'react';
+import { IComponent, IRoute } from '..';
 import Route from './Route';
+import Switch from './Switch';
 
 interface IOpts {
   routes: IRoute[];
@@ -38,19 +38,21 @@ function wrapInitialPropsFetch(route: IRoute, opts: IOpts): IComponent {
        */
       const handleGetInitialProps = async () => {
         // preload when enalbe dynamicImport
+        let preloadComponent: any = Component;
         if (Component.preload) {
-          const preloadComponent = await Component.preload();
+          preloadComponent = await Component.preload();
           // for test case, really use .default
-          Component = preloadComponent.default || preloadComponent;
+          preloadComponent = preloadComponent.default || preloadComponent;
         }
         const defaultCtx = {
           isServer: false,
           match: props?.match,
+          history: props?.history,
           route,
           ...(opts.getInitialPropsCtx || {}),
           ...restRouteParams,
         };
-        if (Component?.getInitialProps) {
+        if (preloadComponent?.getInitialProps) {
           const ctx = await opts.plugin.applyPlugins({
             key: 'ssr.modifyGetInitialPropsCtx',
             type: ApplyPluginsType.modify,
@@ -58,14 +60,14 @@ function wrapInitialPropsFetch(route: IRoute, opts: IOpts): IComponent {
             async: true,
           });
 
-          const initialProps = await Component!.getInitialProps!(
+          const initialProps = await preloadComponent!.getInitialProps!(
             ctx || defaultCtx,
           );
           setInitialProps(initialProps);
         }
       };
       // null 时，一定会触发 getInitialProps 执行
-      if ((window as any).g_initialProps === null) {
+      if (!(window as any).g_initialProps) {
         handleGetInitialProps();
       }
     }, [window.location.pathname, window.location.search]);
@@ -84,13 +86,16 @@ function render({
 }: {
   route: IRoute;
   opts: IOpts;
-  props: object;
+  props: any;
 }) {
-  const routes = renderRoutes({
-    ...opts,
-    routes: route.routes || [],
-    rootRoutes: opts.rootRoutes,
-  });
+  const routes = renderRoutes(
+    {
+      ...opts,
+      routes: route.routes || [],
+      rootRoutes: opts.rootRoutes,
+    },
+    { location: props.location },
+  );
   let { component: Component, wrappers } = route;
   if (Component) {
     const defaultPageInitialProps = opts.isServer
@@ -110,7 +115,7 @@ function render({
     if (wrappers) {
       let len = wrappers.length - 1;
       while (len >= 0) {
-        ret = React.createElement(wrappers[len], newProps, ret);
+        ret = createElement(wrappers[len], newProps, ret);
         len -= 1;
       }
     }
@@ -139,7 +144,9 @@ function getRouteElement({ route, index, opts }: IGetRouteElementOpts) {
       !opts.isServer &&
       // make sure loaded once
       !(route.component as any)?.wrapInitialPropsLoaded &&
-      (route.component?.getInitialProps || route.component?.preload)
+      // TODO need a type
+      ((route.component as any)?.getInitialProps ||
+        (route.component as any)?.preload)
     ) {
       // client Render for enable ssr, but not sure SSR success
       route.component = wrapInitialPropsFetch(route, opts);
@@ -155,9 +162,9 @@ function getRouteElement({ route, index, opts }: IGetRouteElementOpts) {
   }
 }
 
-export default function renderRoutes(opts: IOpts) {
+export default function renderRoutes(opts: IOpts, switchProps = {}) {
   return opts.routes ? (
-    <Switch>
+    <Switch {...switchProps}>
       {opts.routes.map((route, index) =>
         getRouteElement({
           route,

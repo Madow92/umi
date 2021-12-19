@@ -1,17 +1,17 @@
 import { t, traverse } from '@umijs/utils';
 import { parse } from '../utils/parse';
 import {
-  NODE_RESOLVERS,
   findArrayElements,
   findObjectMembers,
+  NODE_RESOLVERS,
 } from './propertyResolver';
 
 export function getExportProps(code: string) {
-  const ast = parse(code) as babel.types.File;
+  const ast = parse(code);
   let props: unknown = undefined;
   traverse.default(ast, {
     Program: {
-      enter(path) {
+      enter(path: any) {
         const node = path.node;
         const defaultExport = findExportDefault(node);
         if (!defaultExport) return;

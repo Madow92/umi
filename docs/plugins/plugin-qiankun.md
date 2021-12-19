@@ -18,7 +18,7 @@ Umi plugin for [qiankun](https://github.com/umijs/qiankun).
 
 ## 介绍
 
-Umi 应用一键开启 [qiankun](https://github.com/umijs/qiankun) 微前端模式。 
+Umi 应用一键开启 [qiankun](https://github.com/umijs/qiankun) 微前端模式。
 
 ## Examples
 
@@ -29,7 +29,7 @@ Umi 应用一键开启 [qiankun](https://github.com/umijs/qiankun) 微前端模�
 ```bash
 $ yarn
 $ yarn build
-$ cd packages/plguin-qiankun && yarn start
+$ cd packages/plugin-qiankun && yarn start
 ```
 
 ## Features
@@ -81,7 +81,7 @@ export const qiankun = fetch('/config').then(({ apps }) => ({
   apps,
   // 完整生命周期钩子请看 https://qiankun.umijs.org/zh/api/#registermicroapps-apps-lifecycles
   lifeCycles: {
-    afterMount: props => {
+    afterMount: (props) => {
       console.log(props);
     },
   },
@@ -89,7 +89,7 @@ export const qiankun = fetch('/config').then(({ apps }) => ({
 }));
 ```
 
-完整的主应用配置项看这里 [masterOptions 配置列表](#masterOptions)
+完整的主应用配置项看这里 [masterOptions 配置列表](#masteroptions)
 
 #### 第二步：装载子应用
 
@@ -105,7 +105,7 @@ export const qiankun = fetch('/config').then(({ apps }) => ({
 
 ```js
 export default {
-	routes: [
+  routes: [
     {
       path: '/',
       component: '../layouts/index.js',
@@ -127,7 +127,7 @@ export default {
       ],
     },
   ],
-}
+};
 ```
 
 我们现在想在 `/app1/project` 和 `/app2` 这两个路径时分别加载微应用 app1 和 app2，只需要增加这样一些配置即可：
@@ -145,7 +145,7 @@ export default {
           routes: [
             {
               path: '/app1/user',
-	          component: './app1/user/index.js',
+              component: './app1/user/index.js',
             },
 +            // 配置微应用 app1 关联的路由
 +            {
@@ -169,6 +169,64 @@ export default {
 }
 ```
 
+微应用路由也可以配置在运行时，通过 src/app.ts 添加：
+
+```ts
+export const qiankun = fetch('/config').then(({ apps }) => {
+  return {
+    apps,
+    routes: [
+      {
+        path: '/app1',
+        microApp: 'app1',
+      },
+    ],
+  };
+});
+```
+
+运行时注册的路由会自动关联到你配置的根路由下面，比如你的路由是这样的：
+
+```ts
+export default {
+  routes: [
+    {
+      path: '/',
+      component: '../layouts/index.js',
+      routes: [
+        {
+          path: '/test',
+          component: './test.js',
+        },
+      ],
+    },
+  ],
+};
+```
+
+完成了上面的运行时微应用路由配置后，你的路由结构会合自动并成这样的：
+
+```diff
+export default {
+  routes: [
+    {
+      path: '/',
+      component: '../layouts/index.js',
+      routes: [
++       {
++         path: '/app1',
++         microApp: 'app1',
++       },
+        {
+          path: '/test',
+          component: './test.js',
+        },
+      ],
+    },
+  ]
+}
+```
+
 ##### b. <a name="MicroApp">使用 `<MicroApp />` 组件的方式</a>
 
 <Alert type="info">
@@ -182,7 +240,7 @@ export default {
 import { MicroApp } from 'umi';
 
 export function MyPage() {
-  
+
   return (
     <div>
       <div>
@@ -201,18 +259,17 @@ export function MyPage() {
 import { MicroApp } from 'umi';
 
 export function MyPage() {
-  
   return (
     <div>
       <div>
-         <MicroApp name="app1" autoSetLoading />
+        <MicroApp name="app1" autoSetLoading />
       </div>
     </div>
-  )
+  );
 }
 ```
 
-默认情况下，当我们检测到你使用的是 antd 组件库时，loading 动画使用的是 antd Spin 组件。
+默认情况下，当我们检测到你使用的是 antd 组件库时，loading 动画使用的是 [antd Spin](https://ant.design/components/spin-cn/) 组件。
 
 如果你需要定制自己的 loading 动画，或者修改组件的样式，你可以这样处理：
 
@@ -220,21 +277,20 @@ export function MyPage() {
 import { MicroApp } from 'umi';
 
 export function MyPage() {
-  
   return (
     <div>
       <MicroApp
         name="app1"
         autoSetLoading
         // 设置自定义 loading 动画
-        loader={loading => <div>loading: {loading}</div>}
+        loader={(loading) => <div>loading: {loading}</div>}
         // 微应用容器 class
         className="myContainer"
-        // wrapper class，仅开启 loading 动画时生效
+        // wrapper class，仅开启 loading 或 errorBoundary 时生效
         wrapperClassName="myWrapper"
       />
     </div>
-  )
+  );
 }
 ```
 
@@ -258,22 +314,119 @@ export function MyPage() {
 import { MicroApp } from 'umi';
 
 export function MyPage() {
-  
   return (
     <div>
       <div>
-         <MicroApp 
-           name="app1"
-           // 关闭 loading 动画
-           autoSetLoading={false}
-         />
+        <MicroApp
+          name="app1"
+          // 关闭 loading 动画
+          autoSetLoading={false}
+        />
       </div>
     </div>
-  )
+  );
 }
 ```
 
+##### 错误边界与微应用加载状态
 
+你可以通过配置 `autoCaptureError` 的方式，捕获微应用加载的生命周期中出现的错误：
+
+```jsx
+import { MicroApp } from 'umi';
+
+export function MyPage() {
+  return (
+    <div>
+      <div>
+        <MicroApp name="app1" autoCaptureError />
+      </div>
+    </div>
+  );
+}
+```
+
+默认情况下，当我们检测到你使用的是 antd 组件库时，ErrorBoundary 会使用 [antd Result](https://ant.design/components/result-cn/) 组件。
+
+如果你需要修改组件的样式，你可以这样处理：
+
+```jsx
+import { MicroApp } from 'umi';
+
+export function MyPage() {
+  return (
+    <div>
+      <MicroApp
+        name="app1"
+        autoCaptureError
+        // 设置自定义 errorBoundary 组件
+        errorBoundary={(error) => <div>Error: {error.message}</div>}
+        // 微应用容器 class
+        className="myContainer"
+        // wrapper class，仅开启 loading 或 errorBoundary 动画时生效
+        wrapperClassName="myWrapper"
+      />
+    </div>
+  );
+}
+```
+
+路由模式下，你可以这样设置一些静态配置来调整 errorBoundary 组件的外观：
+
+```js
+{
+  path: '/user',
+  microApp: 'user',
+  microAppProps: {
+    autoCaptureError: true,
+    className: 'myContainer',
+    wrapperClassName: 'myWrapper',
+  }
+}
+```
+
+或者，你可以通过设置 autoCaptureError false 来关闭默认的报错提示：
+
+```tsx
+import { MicroApp } from 'umi';
+
+export function MyPage() {
+  return (
+    <div>
+      <div>
+        <MicroApp
+          name="app1"
+          // 关闭错误捕获界面
+          autoCaptureError={false}
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+如果你需要实时获取子应用的加载状态，可以通过 ref 获取 microApp 的实例：
+
+```jsx
+import { useRef, useEffect } from 'react';
+import { MicroApp } from 'umi';
+
+export function MyPage() {
+  const microAppRef = useRef(null);
+
+  useEffect(() => {
+    microAppRef.current.mountPromise.then(() => {
+      console.log('app1 mount');
+    });
+  }, []);
+
+  return (
+    <div>
+      <MicroApp ref={microAppRef} name="app1" />
+    </div>
+  );
+}
+```
 
 ### 子应用配置
 
@@ -282,14 +435,14 @@ export function MyPage() {
 ```js
 export default {
   qiankun: {
-    slave: {}
-  }
-}
+    slave: {},
+  },
+};
 ```
 
 #### 第二步：配置运行时生命周期钩子（可选）
 
-如果你需要在子应用的生命周期期间加一些自定义逻辑，可以在子应用的 `src/app.ts` 里导出 `qiankun` 对象，并实现每一个生命周期钩子，其中钩子函数的入参 `props` 由主应用自动注入。
+插件会自动为你创建好 qiankun 子应用需要的生命周期钩子，但是如果你想在生命周期期间加一些自定义逻辑，可以在子应用的 `src/app.ts` 里导出 `qiankun` 对象，并实现每一个生命周期钩子，其中钩子函数的入参 `props` 由主应用自动注入。
 
 ```js
 export const qiankun = {
@@ -316,7 +469,7 @@ export const qiankun = {
 PORT=8081
 ```
 
-详细配置参考：https://umijs.org/zh/guide/env-variables.html#port
+详细配置参考：https://umijs.org/docs/env-variables#port
 
 ### 父子应用通讯
 
@@ -328,36 +481,38 @@ PORT=8081
 
 1. 主应用使用下面任一方式透传数据：
 
-   1. 如果你用的 [MicroApp](#MicroApp) 组件模式消费微应用，那么数据传递的方式就跟普通的 react 组件通信是一样的，直接通过 props 传递即可：
+  1. 如果你用的 [MicroApp](#MicroApp) 组件模式消费微应用，那么数据传递的方式就跟普通的 react 组件通信是一样的，直接通过 props 传递即可：
 
-      ```js
-      function MyPage() {
-        const [name, setName] = useState(null);
-        return <MicroApp name={name} onNameChange={newName => setName(newName)} />
-      }
-      ```
-      
-   2. 如果你用的 [路由绑定式](#RouteBased) 消费微应用，那么你需要在 `src/app.ts` 里导出一个 `useQiankunStateForSlave` 函数，函数的返回值将作为 props 传递给微应用，如：
-      ```ts
-      // src/app.ts
-      export function useQiankunStateForSlave() {
-        const [globalState, setGlobalState] = useState({});
-       
-        return {
-          globalState,
-          setGlobalState,
-        }
-      }
-      ```
-   
+     ```js
+     function MyPage() {
+       const [name, setName] = useState(null);
+       return (
+         <MicroApp name={name} onNameChange={(newName) => setName(newName)} />
+       );
+     }
+     ```
+
+  2. 如果你用的 [路由绑定式](#RouteBased) 消费微应用，那么你需要在 `src/app.ts` 里导出一个 `useQiankunStateForSlave` 函数，函数的返回值将作为 props 传递给微应用，如：
+     ```ts
+     // src/app.ts
+     export function useQiankunStateForSlave() {
+       const [masterState, setMasterState] = useState({});
+
+       return {
+         masterState,
+         setMasterState,
+       };
+     }
+     ```
+
 2. 微应用中会自动生成一个全局 model，可以在任意组件中获取主应用透传的 props 的值。
 
    ```jsx
    import { useModel } from 'umi';
-   
+
    function MyPage() {
      const masterProps = useModel('@@qiankunStateFromMaster');
-     return <div>{ JSON.strigify(masterProps) }</div>;
+     return <div>{JSON.strigify(masterProps)}</div>;
    }
    ```
 
@@ -365,9 +520,9 @@ PORT=8081
 
    ```jsx
    import { connectMaster } from 'umi';
-   
+
    function MyPage(props) {
-     return <div>{ JSON.strigify(props) }</div>;
+     return <div>{JSON.strigify(props)}</div>;
    }
 
    export default connectMaster(MyPage);
@@ -383,15 +538,15 @@ PORT=8081
 
    ```js
    // src/app.js
-   
-   export const qiankun = fetch('/config').then(config => {
+
+   export const qiankun = fetch('/config').then((config) => {
      return {
        apps: [
          {
            name: 'app1',
            entry: '//localhost:2222',
            props: {
-             onClick: event => console.log(event),
+             onClick: (event) => console.log(event),
              name: 'xx',
              age: 1,
            },
@@ -431,7 +586,7 @@ export default {
 import { MicroAppWithMemoHistory } from 'umi';
 
 export function MyPage() {
-  
+
   return (
     <div>
       <div>
@@ -443,21 +598,32 @@ export function MyPage() {
 ```
 
 ### API
-#### <a name="masterOptions">MasterOptions</a>
+
+#### MasterOptions
 
 | 配置 | 说明 | 类型 | 是否必填 | 默认值 |
 | --- | --- | --- | --- | --- |
-| apps | 子应用配置 | [App](#AppOpts)[] | 是 |  |
-| sandbox | 是否启用沙箱，[详细说明](https://qiankun.umijs.org/zh/api/#start-opts) | boolean | 否 | false |
+| apps | 子应用配置 | [App](#app)[] | 是 |  |
+| routes | 子应用运行时需要注册的微应用路由 | [Route](#route)[] | 否 | N/A |
+| sandbox | 是否启用沙箱，[详细说明](https://qiankun.umijs.org/zh/api/#start-opts) | boolean | 否 | true |
 | prefetch | 是否启用 prefetch 特性，[详细说明](https://qiankun.umijs.org/zh/api/#start-opts) | boolean \| 'all' | 否 | true |
 
-#### <a name="AppOpts">App</a>
+#### App
 
 | 配置 | 说明 | 类型 | 是否必填 | 默认值 |
 | --- | --- | --- | --- | --- |
 | name | 子应用唯一 id | string | 是 |  |
 | entry | 子应用 html 地址 | string \| { script: string[], styles: [] } | 是 |  |
+| credentials | 拉取 entry 时是否需要携带cookie，[详见](https://qiankun.umijs.org/zh/faq#%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3%E6%8B%89%E5%8F%96%E5%BE%AE%E5%BA%94%E7%94%A8-entry-%E6%97%B6-cookie-%E6%9C%AA%E6%90%BA%E5%B8%A6%E7%9A%84%E9%97%AE%E9%A2%98) | boolean | 否 | false |
 | props | 主应用传递给子应用的数据 | object | 否 | {} |
+
+#### Route
+
+| 配置 | 说明 | 类型 | 是否必填 | 默认值 |
+| --- | --- | --- | --- | --- |
+| path | 路由 path | string | 是 |  |
+| microApp | 关联的微应用名称 | string | 是 |  |
+| microAppProps | 微应用配置 | {autoSetLoading: boolean, className: string, wrapperClassName: string} | 否 | {} |
 
 ## 升级指南
 
@@ -507,12 +673,12 @@ v2.3.0 完全兼容 v2 之前的版本，但我们还是建议您能升级到最
    -  )
    -}
    ```
-   
+
 4. 关联微应用
 
-   比如我们之前配置了微应用名为 `microApp` 的 base 为 `/microApp` ，mountElementId 为 `subapp-container`， 那么我们只需要（二选一）：
+   比如我们之前配置了一个微应用名为 `microApp` ，base 为 `/microApp` ，mountElementId 为 `subapp-container`， 那么我们只需要（二选一）：
 
-   a. 增加 `/microApp` 的路由
+   a. 增加 `/microApp` 的路由（推荐）
 
    ```jsx
    export default {
@@ -541,7 +707,7 @@ v2.3.0 完全兼容 v2 之前的版本，但我们还是建议您能升级到最
    export default MyPage() {
      return (
        <div>
-         <MicroApp name="microApp" />
+         <MicroApp name="microApp" base="/microApp" />
        </div>
      )
    }
@@ -553,21 +719,21 @@ v2.3.0 完全兼容 v2 之前的版本，但我们还是建议您能升级到最
 
 ### 与 @umijs/plugin-qiankun 2.3.0 之前版本的变化
 
-* 主应用注册子应用时不再需要手动配置 base 和 mountElementId。
+- 主应用注册子应用时不再需要手动配置 base 和 mountElementId。
 
   这类方式会导致很多关联问题，最典型的是如果我们需要将子应用挂载到某一个具体的子路由下时，常出现由于挂载点还未初始化或已被销毁导致的问题。
 
   现在只需要在注册完子应用后，在期望的路由下指定需要挂载的子应用的 name 即可。
 
-* 可以直接通过 `<MicroApp />` 组件的方式在任意位置挂载自己的子应用。详见 [API 说明](#MicroApp)
+- 可以直接通过 `<MicroApp />` 组件的方式在任意位置挂载自己的子应用。详见 [API 说明](#MicroApp)
 
-* 不再支持主应用是 browser 路由模式，子应用是 hash 路由的混合模式。如果有场景需要可以通过自己使用 `<MicroApp />`组件加载子应用。
+- 不再支持主应用是 browser 路由模式，子应用是 hash 路由的混合模式。如果有场景需要可以通过自己使用 `<MicroApp />`组件加载子应用。
 
-* 移除了 base、mountElementId、defer 等配置，现在有更好的方式来解决这类问题，参见第一条。
+- 移除了 base、mountElementId、defer 等配置，现在有更好的方式来解决这类问题，参见第一条。
 
-* rename `jsSandbox` -> `sandbox`，来自 qiankun2.0 的升级。
+- rename `jsSandbox` -> `sandbox`，来自 qiankun2.0 的升级。
 
-* **完全兼容 1.x 插件。**
+- **完全兼容 1.x 插件。**
 
 ## Roadmap
 
@@ -578,15 +744,15 @@ v2.3.0 完全兼容 v2 之前的版本，但我们还是建议您能升级到最
   ```tsx
   // HistoryOptions 配置见 https://github.com/ReactTraining/history/blob/master/docs/api-reference.md
   type HistoryProp = { type: 'browser' | 'memory' | 'hash' } & HistoryOptions;
-  
-  <MicroApp history={{ type: 'browser', basename: '/microApp' }} />
+
+  <MicroApp history={{ type: 'browser', basename: '/microApp' }} />;
   ```
 
 - [ ] 运行时统一，针对多层嵌套微应用场景
 
-- [ ] 微应用自动 mountElementId，避免多个 umi 子应用 mountElementId 冲突
+- [x] 微应用自动 mountElementId，避免多个 umi 子应用 mountElementId 冲突
 
-- [ ] 自动 loading
+- [x] 自动 loading
 
 - [ ] 本地集成开发支持
 
