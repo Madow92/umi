@@ -144,7 +144,7 @@
     "fork-ts-checker-webpack-plugin": "6.0.5",
     "friendly-errors-webpack-plugin": "1.7.0",
     "glob": "7.1.6",
-    "got": "9.6.0",
+    "got": "11.8.5",
     "html-entities": "1.4.0",
     "http-proxy-middleware": "1.0.6",
     "immer": "9.0.6",
